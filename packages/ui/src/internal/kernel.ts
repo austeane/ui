@@ -255,16 +255,20 @@ export class Rec {
   declare node: any
   declare kids: Array<Rec> | undefined
   declare inst: Instance
+  /** Whether this element or an element below it sets a controlled property. */
+  declare controlled: boolean
   constructor(
     v: View.Node<any, any>,
     node: unknown,
     kids: Array<Rec> | undefined,
-    inst: Instance
+    inst: Instance,
+    controlled = false
   ) {
     this.v = v
     this.node = node
     this.kids = kids
     this.inst = inst
+    this.controlled = controlled
   }
 }
 
@@ -1211,7 +1215,14 @@ export const create = (inst: Instance, view: View.Node<any, any>): Rec => {
       }
       if (view.props !== View.noFields) setProps(host, node, view.props)
       host.made?.(node, inst)
-      const rec = new Rec(view, node, kids, inst)
+      const rec = new Rec(
+        view,
+        node,
+        kids,
+        inst,
+        host.controlled !== undefined &&
+          isControlled(host.controlled, view.props, kids)
+      )
       if (
         view.handlers !== View.noFields || view.eventOptions !== View.noFields
       ) host.setEvents(node, rec, true)
@@ -1282,9 +1293,7 @@ export const pairs = (
 const patch = (inst: Instance, old: Rec, view: View.Node<any, any>): Rec => {
   const prev = old.v
   if (prev === view) {
-    if (inst.tree.host.controlled !== undefined && view._tag === "Element") {
-      restore(inst.tree.host, old)
-    }
+    if (old.controlled) restore(inst.tree.host, old)
     return old
   }
   if (!pairs(prev, view)) return replace(inst, old, view)
@@ -1389,12 +1398,30 @@ export const replace = (
 
 const refreshed = {}
 
+const isControlled = (
+  controlled: ReadonlySet<string>,
+  props: Readonly<Record<string, unknown>>,
+  kids: ReadonlyArray<Rec> | undefined
+): boolean => {
+  if (props !== View.noFields) {
+    for (const name in props) {
+      if (controlled.has(name)) return true
+    }
+  }
+  if (kids !== undefined) {
+    for (let index = 0; index < kids.length; index++) {
+      if (kids[index]!.controlled) return true
+    }
+  }
+  return false
+}
+
 const restore = (host: Host, rec: Rec): void => {
   const kids = rec.kids
   if (kids !== undefined) {
     for (let index = 0; index < kids.length; index++) {
       const kid = kids[index]!
-      if (kid.v._tag === "Element") restore(host, kid)
+      if (kid.controlled) restore(host, kid)
     }
   }
   const props = (rec.v as View.Element<any, any>).props
@@ -1513,6 +1540,9 @@ const patchElement = (
     (host.controlled !== undefined && view.props !== View.noFields)
   ) {
     patchProps(host, node, prev.props, view.props)
+  }
+  if (host.controlled !== undefined) {
+    rec.controlled = isControlled(host.controlled, view.props, rec.kids)
   }
   const mount = view.mount as unknown as Attachable | undefined
   const was = prev.mount as unknown as Attachable | undefined
