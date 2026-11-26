@@ -1176,6 +1176,115 @@ describe("BrowserHost", { concurrent: false }, () => {
         ])
       }).pipe(Effect.scoped))
 
+    it.effect("skips static reused lazy subtrees while restoring controlled ones", () =>
+      Effect.gen(function*() {
+        const PageMessage = UiSchema.TaggedEnum({ Toggle: {}, Switch: {} })
+        const PageDef = Html.component({
+          name: "Page",
+          model: Schema.Struct({
+            pressed: Schema.Boolean,
+            editing: Schema.Boolean
+          }),
+          message: PageMessage
+        })
+        const ids = Array.from({ length: 1_000 }, (_, id) => String(id))
+        let counting = false
+        let visits = 0
+        const watch = (node: View.Node<typeof PageMessage.Type>): void => {
+          if (node._tag !== "Element") return
+          const props = node.props
+          Object.defineProperty(node, "props", {
+            configurable: true,
+            enumerable: true,
+            get() {
+              if (counting) visits++
+              return props
+            }
+          })
+          for (const child of node.children) watch(child)
+        }
+        type H = Component.Helper<typeof PageDef>
+        const staticRow = (h: H, id: string) => {
+          const node = View.toNode(
+            h.tr.key(id).children(h.td(h.strong(id)), h.td(h.span("Item")))
+          )
+          watch(node)
+          return node
+        }
+        const controlledRow = (h: H, key: string) =>
+          h.tr.key(key).children(
+            h.td(h.input.attr("aria-label", "text").value("fixed")),
+            h.td(
+              h.select.value("b").children(
+                h.option.attr("value", "a").children("A"),
+                h.option.attr("value", "b").children("B")
+              )
+            ),
+            h.td(h.textarea.value("note")),
+            h.td(h.input.attr("type", "checkbox").checked(true))
+          )
+        const switchRow = (h: H, key: string, editing: boolean) =>
+          h.tr.key(key).children(
+            h.td(
+              editing
+                ? h.input.attr("aria-label", "switch").value("draft")
+                : h.span("Static")
+            )
+          )
+        const Page = PageDef.make({
+          init: () => ({ pressed: false, editing: false }),
+          update: {
+            Toggle: ($) => $.evolve({ pressed: !$.model.pressed }),
+            Switch: ($) => $.evolve({ editing: !$.model.editing })
+          },
+          view: (h, model) =>
+            h.div(
+              h.button.on("click", PageMessage.Toggle()).children(
+                model.pressed ? "On" : "Toggle"
+              ),
+              h.table(
+                h.tbody(
+                  ids.map((id) => h.lazy(staticRow, id)),
+                  h.lazy(controlledRow, "controls"),
+                  h.lazy(switchRow, "switch", model.editing)
+                )
+              )
+            )
+        })
+        const app = yield* container
+        const root = yield* BrowserHost.mountEffect(Page, {}, app)
+        const text = app.querySelector<HTMLInputElement>("input[aria-label]")!
+        const select = app.querySelector("select")!
+        const textarea = app.querySelector("textarea")!
+        const checkbox = app.querySelector<HTMLInputElement>(
+          "input[type=\"checkbox\"]"
+        )!
+        text.value = "edited"
+        select.value = "a"
+        textarea.value = "edited"
+        checkbox.checked = false
+        counting = true
+        root.send(PageMessage.Toggle())
+        yield* tick
+        counting = false
+        assert.strictEqual(app.querySelector("button")!.textContent, "On")
+        assert.strictEqual(visits, 0)
+        assert.deepStrictEqual(
+          [text.value, select.value, textarea.value, checkbox.checked],
+          ["fixed", "b", "note", true]
+        )
+        // A lazy row that gains a control via patchElement is restored on later reuse.
+        root.send(PageMessage.Switch())
+        yield* tick
+        const switched = app.querySelector<HTMLInputElement>(
+          "input[aria-label=\"switch\"]"
+        )!
+        switched.value = "edited"
+        root.send(PageMessage.Toggle())
+        yield* tick
+        assert.strictEqual(switched.value, "draft")
+      }).pipe(Effect.scoped))
+
     it("builds again what a render that threw built", () => {
       let fails = true
       const Failing = ItemsDef.make({
