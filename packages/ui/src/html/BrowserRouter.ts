@@ -11,11 +11,13 @@
  *
  * Links are plain anchors with a printed route. A click is intercepted only
  * when the routes parse its href and it has no modifier key, `target` or
- * `download`. Anything else is a full page load. `<form method="get">` is
- * intercepted by the same test. Following either to the current route sends a
- * message without scrolling to the top, announcing or moving focus. A change
- * to the hash still scrolls as usual. Both work the same in a root mounted
- * inside a shadow root, open or closed.
+ * `download`. Anything else is a full page load. A `<form>` with no `submit`
+ * handler and effective method `get` to the same window is intercepted by the
+ * same test; other forms with no handler, such as POST forms or forms targeting
+ * another window, are left to the browser. Following either to the current
+ * route sends a message without scrolling to the top, announcing or moving
+ * focus. A change to the hash still scrolls as usual. Both work the same in a
+ * root mounted inside a shadow root, open or closed.
  *
  * Once a navigation settles (the first flush after the root received it in
  * which no Layer build begun since is still pending), the router scrolls,
@@ -462,23 +464,17 @@ const make = (
       if (href !== undefined) Effect.runSync(router.intent(href))
     }
     const onSubmit = (event: SubmitEvent) => {
-      // BrowserHost prevents every submission of a form the app rendered. If the app has no
-      // submit handler for it, the form is still the Router's to follow.
+      // BrowserHost prevents an unhandled same-window GET submission of a form the app
+      // rendered, and marks it so the Router can still follow it.
       const ownedUnhandled = submit.ownedUnhandled.has(event)
       if (event.defaultPrevented && !ownedUnhandled) return
       const form = event.target as HTMLFormElement | null
       if (form === null || form.localName !== "form") return
       flushHistory()
       const submitter = event.submitter as HTMLButtonElement | null
-      const method =
-        (submitter?.getAttribute("formmethod") ?? form.getAttribute("method") ??
-          "get").toLowerCase()
-      const targetAttribute = submitter?.getAttribute("formtarget") ??
-        form.getAttribute("target")
       if (
-        method !== "get" ||
-        (targetAttribute !== null && targetAttribute !== "" &&
-          targetAttribute !== "_self")
+        submit.methodOf(form, submitter) !== "get" ||
+        !submit.isSameWindow(form, submitter)
       ) {
         return
       }

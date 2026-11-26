@@ -12,9 +12,12 @@
  * `value`, `keydown` the `key` and the modifier keys, and `submit` the
  * form's `fields`. A handler set with `{ preventDefault: true }` cancels the
  * browser's default when it produces a message and leaves it alone when it
- * returns `undefined`, so it decides per event. A form's `submit` is always
- * cancelled, with or without a handler. Nothing stops an event's propagation:
- * only the innermost element with a handler for an event gets it.
+ * returns `undefined`, so it decides per event. A form's `submit` is
+ * cancelled when the form has a handler, when its method is `dialog`, or when
+ * it is a GET to the same window, which `BrowserRouter` follows. Other
+ * submissions with no handler are left to the browser. Nothing stops an
+ * event's propagation: only the innermost element with a handler for an event
+ * gets it.
  *
  * Use `draggable(data)` for a drag source and
  * `dropTarget({ accepts }).on("drop", handler)` for a drop target. The host

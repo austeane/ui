@@ -590,12 +590,6 @@ export const makeHost = (
       if (name === "compositionstart" || composed) composing.add(target)
       else composing.delete(target)
     }
-    const owned = name === "submit" && event.target !== null &&
-      forms.has(event.target)
-    if (owned) {
-      event.preventDefault()
-      submit.ownedUnhandled.add(event)
-    }
     if (name === "dragstart") startDrag(event as DragEvent, path)
     const handled = deliver(
       event,
@@ -619,7 +613,19 @@ export const makeHost = (
             lastPointer
           )
     )
-    if (owned && handled) submit.ownedUnhandled.delete(event)
+    if (name === "submit" && event.target !== null && forms.has(event.target)) {
+      if (handled) event.preventDefault()
+      else {
+        const form = event.target as HTMLFormElement
+        const submitter = (event as SubmitEvent).submitter
+        const method = submit.methodOf(form, submitter)
+        if (method === "dialog") event.preventDefault()
+        else if (method === "get" && submit.isSameWindow(form, submitter)) {
+          event.preventDefault()
+          submit.ownedUnhandled.add(event)
+        }
+      }
+    }
     if (name === "dragend") endTargets()
     if (restoring.has(name) && target !== undefined && target !== null) {
       restoreSoon(target)

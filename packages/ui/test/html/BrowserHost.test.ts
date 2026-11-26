@@ -2255,6 +2255,98 @@ describe("BrowserHost", { concurrent: false }, () => {
         expect(submitted(upper.querySelector("form")!)).toBe(true)
       }).pipe(Effect.scoped))
 
+    it.effect("leaves unhandled POST and other-window forms to the browser, while cancelling handled, dialog and same-window GET forms", () =>
+      Effect.gen(function*() {
+        const Page = Html.component({
+          name: "Page",
+          model: Schema.Array(Schema.String),
+          message: Schema.String
+        }).make({
+          init: () => [],
+          update: ($, message) => [...$.model, message],
+          view: (h) =>
+            h.div(
+              h.form.attrs({
+                id: "post-unhandled",
+                method: "post",
+                action: "/items"
+              }),
+              h.form.attrs({
+                id: "post-handled",
+                method: "post",
+                action: "/items"
+              }).on("submit", "submitted"),
+              h.form.attrs({
+                id: "get-blank",
+                method: "get",
+                action: "/search",
+                target: "_blank"
+              }).children(
+                h.button.attrs({
+                  id: "same-window",
+                  type: "submit",
+                  formtarget: "_self"
+                }).children("Here")
+              ),
+              h.form.attrs({
+                id: "get-self",
+                method: "get",
+                action: "/search",
+                target: "_self"
+              }).children(
+                h.button.attrs({
+                  id: "as-post",
+                  type: "submit",
+                  formmethod: "post"
+                }).children("Post"),
+                h.button.attrs({
+                  id: "as-blank",
+                  type: "submit",
+                  formtarget: "_blank"
+                }).children("Blank")
+              ),
+              h.form.attrs({
+                id: "post-override",
+                method: "post",
+                action: "/search"
+              }).children(
+                h.button.attrs({
+                  id: "as-get",
+                  type: "submit",
+                  formmethod: "get"
+                }).children("Get")
+              ),
+              h.form.attrs({ id: "dialog-unhandled", method: "dialog" })
+            )
+        })
+        const app = yield* container
+        const root = yield* BrowserHost.mountEffect(Page, {}, app)
+        const submit = (id: string, submitterId?: string) => {
+          const form = app.querySelector<HTMLFormElement>(`#${id}`)!
+          const submitter = submitterId === undefined
+            ? null
+            : app.querySelector<HTMLElement>(`#${submitterId}`)
+          const event = new SubmitEvent("submit", {
+            bubbles: true,
+            cancelable: true,
+            submitter
+          })
+          form.dispatchEvent(event)
+          return event.defaultPrevented
+        }
+        expect(submit("post-unhandled")).toBe(false)
+        expect(submit("post-handled")).toBe(true)
+        expect(submit("get-blank")).toBe(false)
+        expect(submit("get-blank", "same-window")).toBe(true)
+        expect(submit("get-self")).toBe(true)
+        expect(submit("get-self", "as-post")).toBe(false)
+        expect(submit("get-self", "as-blank")).toBe(false)
+        expect(submit("post-override", "as-get")).toBe(true)
+        expect(submit("dialog-unhandled")).toBe(true)
+        yield* tick
+        expect(root.model()).toEqual(["submitted"])
+      }).pipe(Effect.scoped))
+
     it.effect("preventDefault cancels the default only when the handler sends, before the message is sent", () =>
       Effect.gen(function*() {
         let event: Event | undefined

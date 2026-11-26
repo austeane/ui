@@ -662,6 +662,92 @@ describe("BrowserRouter", { concurrent: false }, () => {
       )
     }).pipe(Effect.scoped))
 
+  it.effect("leaves unhandled POST and other-window forms to the browser, and routes same-window GET forms", () =>
+    Effect.gen(function*() {
+      window.history.replaceState(null, "", "/")
+      yield* Layer.build(BrowserRouter.layer({ routes: AppRoute }))
+      const Page = Html.component({
+        name: "Page",
+        model: Schema.Array(Schema.String),
+        message: Schema.String
+      }).make({
+        init: () => [],
+        update: ($, message) => [...$.model, message],
+        view: (h) =>
+          h.div(
+            h.form.attrs({ id: "post", method: "post", action: "/search" })
+              .children(
+                h.input.attrs({ name: "q", value: "y" }),
+                h.button.attrs({
+                  id: "as-get",
+                  type: "submit",
+                  formmethod: "get"
+                }).children("Get")
+              ),
+            h.form.attrs({
+              id: "post-handled",
+              method: "post",
+              action: "/search"
+            }).on("submit", "handled"),
+            h.form.attrs({
+              id: "get-blank",
+              method: "get",
+              action: "/search",
+              target: "_blank"
+            }).children(h.input.attrs({ name: "q", value: "z" })),
+            h.form.attrs({ id: "get", method: "get", action: "/search" })
+              .children(
+                h.input.attrs({ name: "q", value: "x" }),
+                h.button.attrs({
+                  id: "as-post",
+                  type: "submit",
+                  formmethod: "post"
+                }).children("Post"),
+                h.button.attrs({
+                  id: "as-blank",
+                  type: "submit",
+                  formtarget: "_blank"
+                }).children("Blank")
+              )
+          )
+      })
+      const app = yield* container
+      const root = yield* BrowserHost.mountEffect(Page, {}, app)
+      const fire = (id: string, submitterId?: string) => {
+        const form = app.querySelector<HTMLFormElement>(`#${id}`)!
+        const submitter = submitterId === undefined
+          ? null
+          : app.querySelector<HTMLElement>(`#${submitterId}`)
+        const event = new SubmitEvent("submit", {
+          bubbles: true,
+          cancelable: true,
+          submitter
+        })
+        form.dispatchEvent(event)
+        return event.defaultPrevented
+      }
+      expect(fire("post")).toBe(false)
+      expect(fire("post-handled")).toBe(true)
+      expect(fire("get-blank")).toBe(false)
+      expect(fire("get", "as-post")).toBe(false)
+      expect(fire("get", "as-blank")).toBe(false)
+      yield* tick
+      expect(window.location.pathname).toBe("/")
+      expect(root.model()).toEqual(["handled"])
+
+      expect(fire("get")).toBe(true)
+      yield* tick
+      expect(window.location.pathname + window.location.search).toBe(
+        "/search?q=x"
+      )
+
+      expect(fire("post", "as-get")).toBe(true)
+      yield* tick
+      expect(window.location.pathname + window.location.search).toBe(
+        "/search?q=y"
+      )
+    }).pipe(Effect.scoped))
+
   it.effect("follows GET forms and reports each composed touch intent once in a closed shadow root", () =>
     Effect.gen(function*() {
       const { app, router } = yield* start("/", {}, "closed")

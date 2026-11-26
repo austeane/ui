@@ -479,6 +479,71 @@ describe("HtmlHydrate", () => {
         assert.isFalse(submitted(served))
       }).pipe(Effect.scoped))
 
+    it.effect("treat an adopted form's method and target the same as a mounted one", () =>
+      Effect.gen(function*() {
+        const Page = Html.component({
+          name: "Page",
+          model: Schema.Array(Schema.String),
+          message: Schema.String
+        }).make({
+          init: () => [],
+          update: ($, message) => [...$.model, message],
+          view: (h) =>
+            h.div(
+              h.form.attrs({ id: "post", method: "post", action: "/items" }),
+              h.form.attrs({
+                id: "post-handled",
+                method: "post",
+                action: "/items"
+              }).on("submit", "handled"),
+              h.form.attrs({ id: "get", method: "get", action: "/search" })
+                .children(
+                  h.button.attrs({
+                    id: "as-post",
+                    type: "submit",
+                    formmethod: "post"
+                  }).children("Post")
+                ),
+              h.form.attrs({
+                id: "get-blank",
+                method: "get",
+                action: "/search",
+                target: "_blank"
+              })
+            )
+        })
+        const rendered = yield* HtmlServer.renderToHtml(Page, {})
+        const app = yield* container(rendered.html)
+        const servedForms = [...app.querySelectorAll("form")]
+        const root = yield* HtmlHydrate.hydrateEffect(
+          Page,
+          {},
+          app,
+          rendered.state
+        )
+        assert.deepStrictEqual([...app.querySelectorAll("form")], servedForms)
+        const fire = (id: string, submitterId?: string) => {
+          const form = app.querySelector<HTMLFormElement>(`#${id}`)!
+          const submitter = submitterId === undefined
+            ? null
+            : app.querySelector<HTMLElement>(`#${submitterId}`)
+          const event = new SubmitEvent("submit", {
+            bubbles: true,
+            cancelable: true,
+            submitter
+          })
+          form.dispatchEvent(event)
+          return event.defaultPrevented
+        }
+        assert.isFalse(fire("post"))
+        assert.isTrue(fire("post-handled"))
+        assert.isTrue(fire("get"))
+        assert.isFalse(fire("get", "as-post"))
+        assert.isFalse(fire("get-blank"))
+        yield* tick
+        assert.deepStrictEqual(root.model(), ["handled"])
+      }).pipe(Effect.scoped))
+
     it.effect("leave an instance's form to submit natively while its Layer builds", () =>
       Effect.gen(function*() {
         const rendered = yield* HtmlServer.renderToHtml(Gated, {})
