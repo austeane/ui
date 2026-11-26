@@ -98,4 +98,34 @@ it.layer(TestHost.layer(), { buildPerTest: true })("Play", (it) => {
         /Play\.expect\(<p>\)\.toHaveText\("saves: 9"\): its text is "saves: 0"; elements:\n  <div>/
       )
     }))
+
+  it.effect("toHaveAttribute works on Play", () =>
+    Effect.gen(function*() {
+      const Item = Component.define({
+        name: "Item",
+        model: Schema.Null,
+        message: Schema.Never
+      }).make({
+        init: () => null,
+        update: ($) => $.model,
+        view: (h) =>
+          h.el("div").children(
+            h.el("a").attrs({ href: "/items/1" }).children("Open")
+          )
+      })
+      const play = yield* Play.make(Item, {})
+      const link = Locator.tag("a")
+      yield* play.expect(link).toHaveAttribute("href")
+      yield* play.expect(link).toHaveAttribute("href", "/items/1")
+      yield* play.expect(link).toHaveAttribute("href", /^\/items\//)
+      yield* play.expect(link).toHaveAttribute("download", false)
+      assert.match(
+        failureOf(
+          yield* Effect.exit(
+            play.expect(link).toHaveAttribute("href", "/items/2")
+          )
+        ),
+        /Play\.expect\(<a>\)\.toHaveAttribute\("href", "\/items\/2"\): its href is "\/items\/1"; elements:\n  <div>/
+      )
+    }))
 })

@@ -1,5 +1,6 @@
 import { Command, Component, type Query, UiSchema, type View } from "@effect/ui"
-import type { Steps } from "@effect/ui/testing"
+import type { HtmlPlay, HtmlScene } from "@effect/ui/html/testing"
+import type { Play, Steps } from "@effect/ui/testing"
 import { Scene, Story } from "@effect/ui/testing"
 import { Effect, Schema, type Scope, Stream } from "effect"
 import { describe, expect, it } from "tstyche"
@@ -327,5 +328,43 @@ describe("Story's re-exports of the Steps types", () => {
     expect<Story.KeyedLoad<Read>>().type.toBe<Steps.KeyedLoad<Read>>()
     expect<Story.Target>().type.toBe<Steps.Target>()
     expect<Story.StreamTarget>().type.toBe<Steps.StreamTarget>()
+  })
+})
+
+declare const sceneExpect: Scene.Expect<Scene.Steps<typeof Counter>>
+declare const htmlSceneExpect: HtmlScene.Expect<HtmlScene.Steps<typeof Counter>>
+declare const playExpect: Play.Expect
+declare const htmlPlayExpect: HtmlPlay.Expect
+
+describe("Scene.Expect.toHaveAttribute", () => {
+  it("is available on Scene, HtmlScene, Play and HtmlPlay expectations", () => {
+    for (
+      const target of [
+        sceneExpect.toHaveAttribute,
+        htmlSceneExpect.toHaveAttribute,
+        playExpect.toHaveAttribute,
+        htmlPlayExpect.toHaveAttribute
+      ]
+    ) {
+      expect(target).type.toBeCallableWith("href")
+      expect(target).type.toBeCallableWith("href", "/items/1")
+      expect(target).type.toBeCallableWith("href", /^\/items\//)
+      expect(target).type.toBeCallableWith("download", false)
+      expect(target).type.not.toBeCallableWith("download", true)
+      expect(target).type.not.toBeCallableWith("tabindex", 0)
+    }
+
+    expect(sceneExpect.toHaveAttribute("href")).type.toBe<
+      Scene.Steps<typeof Counter>
+    >()
+    expect(htmlSceneExpect.toHaveAttribute("href")).type.toBe<
+      HtmlScene.Steps<typeof Counter>
+    >()
+    expect(playExpect.toHaveAttribute("href")).type.toBe<
+      Effect.Effect<void, Play.StepError>
+    >()
+    expect(htmlPlayExpect.toHaveAttribute("href")).type.toBe<
+      Effect.Effect<void, Play.StepError>
+    >()
   })
 })

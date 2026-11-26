@@ -121,6 +121,79 @@ describe("Scene", () => {
     )
   })
 
+  it("toHaveAttribute checks presence, exact string, RegExp, absence with false, and boolean attributes", () => {
+    const Page = Html.component({
+      name: "Page",
+      model: Schema.Null,
+      message: Schema.Never
+    }).make({
+      init: () => null,
+      update: ($) => $.model,
+      view: (h) =>
+        h.div(
+          h.a.attrs({ href: "/items/42", "aria-current": "page" }).children(
+            "Item"
+          ),
+          h.button.disabled(true).children("Submit"),
+          h.p.attr("hidden", "").children("Note"),
+          h.span("a"),
+          h.span("b")
+        )
+    })
+    const scene = Scene.start(Page, {})
+    const link = HtmlLocator.role("link", { name: "Item" })
+    const button = HtmlLocator.role("button", { name: "Submit" })
+    const hidden = Locator.tag("p")
+    const missing = HtmlLocator.role("link", { name: "Missing" })
+
+    scene
+      .expect(link).toHaveAttribute("href")
+      .expect(link).toHaveAttribute("href", "/items/42")
+      .expect(link).toHaveAttribute("href", /^\/items\/\d+$/)
+      .expect(link).toHaveAttribute("aria-current", "page")
+      .expect(link).toHaveAttribute("download", false)
+      .expect(button).toHaveAttribute("disabled")
+      .expect(button).toHaveAttribute("disabled", "")
+      .expect(hidden).toHaveAttribute("hidden")
+
+    assert.throws(
+      () => scene.expect(link).toHaveAttribute("download"),
+      /^Scene\.expect\(role "link", name "Item"\)\.toHaveAttribute\("download"\): it has no download attribute; elements:\n {2}<div>/
+    )
+    assert.throws(
+      () => scene.expect(link).toHaveAttribute("href", "/items/43"),
+      /^Scene\.expect\(role "link", name "Item"\)\.toHaveAttribute\("href", "\/items\/43"\): its href is "\/items\/42"; elements:\n {2}<div>/
+    )
+    assert.throws(
+      () => scene.expect(link).toHaveAttribute("href", /^\/other\//),
+      /^Scene\.expect\(role "link", name "Item"\)\.toHaveAttribute\("href", \/\^\\\/other\\\/\/\): its href is "\/items\/42"; elements:\n {2}<div>/
+    )
+    assert.throws(
+      () => scene.expect(link).toHaveAttribute("download", "item.pdf"),
+      /^Scene\.expect\(role "link", name "Item"\)\.toHaveAttribute\("download", "item\.pdf"\): it has no download attribute; elements:\n {2}<div>/
+    )
+    assert.throws(
+      () => scene.expect(link).toHaveAttribute("href", false),
+      /^Scene\.expect\(role "link", name "Item"\)\.toHaveAttribute\("href", false\): its href is "\/items\/42"; elements:\n {2}<div>/
+    )
+    assert.throws(
+      () => scene.expect(button).toHaveAttribute("disabled", false),
+      /^Scene\.expect\(role "button", name "Submit"\)\.toHaveAttribute\("disabled", false\): its disabled is ""; elements:\n {2}<div>/
+    )
+    assert.throws(
+      () => scene.expect(missing).toHaveAttribute("href"),
+      /^Scene\.expect\(role "link", name "Missing"\)\.toHaveAttribute\("href"\): 0 elements match; elements:\n {2}<div>/
+    )
+    assert.throws(
+      () => scene.expect(missing).toHaveAttribute("download", false),
+      /^Scene\.expect\(role "link", name "Missing"\)\.toHaveAttribute\("download", false\): 0 elements match; elements:\n {2}<div>/
+    )
+    assert.throws(
+      () => scene.expect(Locator.tag("span")).toHaveAttribute("id", false),
+      /^Scene\.expect\(<span>\)\.toHaveAttribute\("id", false\): 2 elements match; elements:\n {2}<div>/
+    )
+  })
+
   it("fire throws when nothing handles the event, submit included", () => {
     const scene = Scene.start(Note, {})
     assert.throws(

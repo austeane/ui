@@ -83,6 +83,26 @@ export const matchers = {
         ? text === expected
         : expected.test(text)
       return pass ? undefined : `its text is ${JSON.stringify(text)}`
+    }),
+  toHaveAttribute: (
+    name: string,
+    expected?: string | RegExp | false
+  ): Matcher =>
+    single((node) => {
+      const actual = node.attrs !== undefined && Object.hasOwn(node.attrs, name)
+        ? node.attrs[name]
+        : undefined
+      if (expected === false) {
+        return actual === undefined
+          ? undefined
+          : `its ${name} is ${JSON.stringify(actual)}`
+      }
+      if (actual === undefined) return `it has no ${name} attribute`
+      if (expected === undefined) return undefined
+      const pass = typeof expected === "string"
+        ? actual === expected
+        : expected.test(actual)
+      return pass ? undefined : `its ${name} is ${JSON.stringify(actual)}`
     })
 }
 

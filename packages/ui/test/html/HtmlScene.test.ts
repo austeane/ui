@@ -289,8 +289,11 @@ describe("HtmlScene", () => {
         .click(HtmlLocator.label("Agree"))
         .expect(log).toHaveText("agree:true|agree:false")
         .expect(HtmlLocator.label("Off")).toBeDisabled()
+        .expect(HtmlLocator.label("Off")).toHaveAttribute("disabled")
         .expect(HtmlLocator.label("Agree")).toBeDisabled(false)
+        .expect(HtmlLocator.label("Agree")).toHaveAttribute("disabled", false)
         .expect(HtmlLocator.label("Zip code")).toHaveAccessibleName("Zip code")
+        .expect(HtmlLocator.label("Zip code")).toHaveAttribute("name", "zip")
       const started = HtmlScene.start(Settings, {})
       assert.throws(
         () => started.expect(HtmlLocator.label("Agree")).toBeChecked(),

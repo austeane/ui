@@ -113,6 +113,17 @@ describe("HtmlPlay", () => {
         })
         yield* settings.click(HtmlLocator.role("checkbox", { name: "Agree" }))
         yield* settings.expect(HtmlLocator.label("Agree")).toBeChecked()
+        yield* settings.expect(HtmlLocator.label("Off")).toHaveAttribute(
+          "disabled"
+        )
+        yield* settings.expect(HtmlLocator.label("Agree")).toHaveAttribute(
+          "disabled",
+          false
+        )
+        yield* settings.expect(HtmlLocator.label("Zip code")).toHaveAttribute(
+          "placeholder",
+          "90210"
+        )
         yield* settings.click(HtmlLocator.role("button", { name: "Go" }))
         yield* settings.expect(log).toHaveText(browser!)
         yield* settings.click("Menu")
