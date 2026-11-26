@@ -29,7 +29,9 @@ const attributes: ReadonlySet<string> = new Set([
   "action",
   "formaction",
   "xlink:href",
-  "data"
+  "data",
+  "from",
+  "to"
 ])
 
 const properties: ReadonlySet<string> = new Set([
@@ -46,7 +48,9 @@ const properties: ReadonlySet<string> = new Set([
  * @internal
  */
 export const blockedAttribute = (name: string, value: string): boolean =>
-  attributes.has(name) && isScript(value)
+  attributes.has(name)
+    ? isScript(value)
+    : name === "values" && value.split(";").some(isScript)
 
 /**
  * Whether a URL is blocked for property `name` of a built-in `tag`.

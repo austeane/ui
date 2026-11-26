@@ -46,13 +46,15 @@
  * reports it, and the Model must follow. Position a popover next to its
  * trigger with CSS anchor positioning.
  *
- * The HTML renderers omit `href`, `src`, `action`, `formaction`, `xlink:href`
- * and `data` attributes containing `javascript:` or `vbscript:` URLs. Setting
- * a built-in element's `href`, `src`, `action`, `formAction` or `data` property
- * to a blocked URL removes its reflected attribute instead. Custom element
- * properties are unchanged. These checks apply to server rendering, browser
- * updates, hydration and head attributes. Scheme checks ignore case, ASCII
- * controls and spaces; relative URLs and other schemes pass through unchanged.
+ * The HTML renderers omit `href`, `src`, `action`, `formaction`, `xlink:href`,
+ * `data`, `from` and `to` attributes containing `javascript:` or `vbscript:`
+ * URLs, and `values` attributes where any semicolon-separated item does.
+ * Setting a built-in element's `href`, `src`, `action`, `formAction` or `data`
+ * property to a blocked URL removes its reflected attribute instead. Custom
+ * element properties are unchanged. These checks apply to server rendering,
+ * browser updates, hydration and head attributes. Scheme checks ignore case,
+ * ASCII controls and spaces; relative URLs and other schemes pass through
+ * unchanged.
  *
  * **Example** (A controlled text field)
  *
