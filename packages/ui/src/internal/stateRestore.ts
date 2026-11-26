@@ -128,14 +128,6 @@ export const restoreQueries = (
   return out
 }
 
-const resolveComponent = (component: unknown): Component.Any | undefined => {
-  if (lazy.isLazy(component)) {
-    const state = lazy.stateOf(component)
-    return state._tag === "Loaded" ? state.component : undefined
-  }
-  return component as Component.Any
-}
-
 /** @internal */
 export const make = (options: Options): StateRestore => {
   const {
@@ -268,7 +260,7 @@ export const make = (options: Options): StateRestore => {
     for (const author in held.notes) {
       Object.assign(keptIn(to, top, author), held.notes[author])
     }
-    const component = resolveComponent(view.component)
+    const component = lazy.componentOf(view.component)
     if (component === undefined) return
     const restore = component.definition.restore
     const state = saved[path]
@@ -305,7 +297,7 @@ export const make = (options: Options): StateRestore => {
   >()
   const hold: StateRestore["hold"] = (owner, rec, at) => {
     const view = rec.v as View.Child<any, any>
-    const component = resolveComponent(view.component)
+    const component = lazy.componentOf(view.component)
     if (component === undefined || component.definition?.restore === false) {
       return false
     }

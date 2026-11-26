@@ -6,6 +6,7 @@ import type * as Renderer from "../Renderer.ts"
 import type * as View from "../View.ts"
 import { runCodec } from "./codecRun.ts"
 import * as Kernel from "./kernel.ts"
+import * as lazy from "./lazy.ts"
 import { segmentOf } from "./paths.ts"
 import { boundOf, type Cache } from "./queryCore.ts"
 import { restored } from "./sharedRun.ts"
@@ -63,7 +64,7 @@ const use = (target: Kernel.Host, from: Kernel.Host): void => {
 }
 
 const decode = (
-  component: Kernel.Runnable,
+  component: Kernel.Runnable | Component.Any,
   encoded: unknown
 ): Exit.Exit<Decoded, unknown> | Fiber.Fiber<Decoded, unknown> =>
   runCodec(stateCodecOf(component as unknown as Component.Any).decode(encoded))
@@ -179,8 +180,10 @@ export const make = (
     const path = (view.alive === undefined && at || owner.path) + "/" +
       segmentOf(view.component, view.key)
     if (resuming && resumed.delete(rec)) return false
-    const served = serves(owner, path)
+    const component = lazy.componentOf(view.component)
+    const served = component !== undefined && serves(owner, path)
     if (view.alive === undefined) active?.child(path, served)
+    if (component === undefined) return fallback?.(owner, rec, at) === true
     const from = served
       ? state as Saved
       : supplyOf(owner, path, view.alive !== undefined)
@@ -205,7 +208,7 @@ export const make = (
       active?.has(path) === false
     const exit = behind
       ? undefined
-      : decode(view.component as never, from[path])
+      : decode(component, from[path])
     if (exit !== undefined && Exit.isExit(exit) && !away) {
       if (!served && Exit.isFailure(exit)) {
         return fallback?.(owner, rec, at) === true
@@ -261,7 +264,7 @@ export const make = (
         if (!waiting) return
         waiting = false
         if (rec.inst !== owner || receiver!.closed) return go(Exit.interrupt())
-        const exit = decode(view.component as never, from[path])
+        const exit = decode(component, from[path])
         if (Exit.isExit(exit)) go(exit)
         else exit.addObserver(go)
       }

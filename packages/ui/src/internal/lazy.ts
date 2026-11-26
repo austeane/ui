@@ -28,6 +28,15 @@ export const isLazy = (u: unknown): u is Component.Lazy.Any =>
 export const stateOf = (lazy: Component.Lazy.Any): State => (lazy as Lazy).state
 
 /** @internal */
+export const componentOf = (component: unknown): Component.Any | undefined => {
+  if (isLazy(component)) {
+    const state = stateOf(component)
+    return state._tag === "Loaded" ? state.component : undefined
+  }
+  return component as Component.Any
+}
+
+/** @internal */
 export const watch = (
   lazy: Component.Lazy.Any,
   listener: () => void

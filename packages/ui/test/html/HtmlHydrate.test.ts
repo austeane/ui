@@ -3,6 +3,8 @@ import { Component, Feature, UiSchema } from "@effect/ui"
 import { Html, HtmlServer } from "@effect/ui/html"
 import * as BrowserHost from "@effect/ui/html/BrowserHost"
 import * as HtmlHydrate from "@effect/ui/html/HtmlHydrate"
+import { ssr } from "@effect/ui/html/testing"
+import { TestHost } from "@effect/ui/testing"
 import { assert, describe, it } from "@effect/vitest"
 import {
   Deferred,
@@ -554,5 +556,192 @@ describe("HtmlHydrate", () => {
         assert.strictEqual(app.querySelector("form"), served)
         assert.isFalse(submitted(served))
       }).pipe(Effect.scoped))
+  })
+
+  describe("lazy children", () => {
+    it.effect("adopts a preloaded lazy child's nodes and saved Model", () =>
+      Effect.gen(function*() {
+        let side = "server"
+        const Page = Html.component({
+          name: "Page",
+          model: Schema.String,
+          message: Schema.Never
+        }).make({
+          init: () => side,
+          update: ($) => $.model,
+          view: (h, model) => h.label(model, h.input.attr("name", "q"))
+        })
+        const makeApp = () => {
+          const LazyPage = Component.lazy(
+            "LazyPage",
+            () => Promise.resolve(Page)
+          )
+          const App = Html.component({
+            name: "App",
+            model: Schema.Null,
+            message: Schema.Never
+          }).make({
+            init: () => null,
+            update: ($) => $.model,
+            view: (h) => h.div(LazyPage(h, { fallback: () => h.p("Loading") }))
+          })
+          return { App, LazyPage }
+        }
+
+        const rendered = yield* HtmlServer.renderToHtml(makeApp().App, {})
+        assert.isTrue(Object.hasOwn(rendered.state, "/App/LazyPage[]"))
+        const app = yield* container(rendered.html)
+        const serverInput = app.querySelector("input")!
+        assert.isNotNull(serverInput)
+
+        side = "client"
+        const client = makeApp()
+        yield* Effect.promise(() => client.LazyPage.preload())
+        const root = yield* HtmlHydrate.hydrateEffect(
+          client.App,
+          {},
+          app,
+          rendered.state
+        )
+        yield* root.adopted
+        yield* tick
+
+        assert.strictEqual(app.querySelector("input"), serverInput)
+        assert.strictEqual(app.querySelector("label")?.textContent, "server")
+      }).pipe(Effect.scoped))
+
+    it.effect("keeps the fallback path when a lazy child was not preloaded", () =>
+      Effect.gen(function*() {
+        let side = "server"
+        const Page = Html.component({
+          name: "Page",
+          model: Schema.String,
+          message: Schema.Never
+        }).make({
+          init: () => side,
+          update: ($) => $.model,
+          view: (h, model) => h.label(model, h.input.attr("name", "q"))
+        })
+        const makeApp = () => {
+          const LazyPage = Component.lazy(
+            "LazyPage",
+            () => Promise.resolve(Page)
+          )
+          const App = Html.component({
+            name: "App",
+            model: Schema.Null,
+            message: Schema.Never
+          }).make({
+            init: () => null,
+            update: ($) => $.model,
+            view: (h) => h.div(LazyPage(h, { fallback: () => h.p("Loading") }))
+          })
+          return { App }
+        }
+
+        const rendered = yield* HtmlServer.renderToHtml(makeApp().App, {})
+        const app = yield* container(rendered.html)
+        const serverInput = app.querySelector("input")!
+
+        side = "client"
+        const root = yield* HtmlHydrate.hydrateEffect(
+          makeApp().App,
+          {},
+          app,
+          rendered.state
+        )
+        yield* root.adopted
+        yield* tick
+
+        assert.notStrictEqual(app.querySelector("input"), serverInput)
+        assert.strictEqual(app.querySelector("label")?.textContent, "client")
+      }).pipe(Effect.scoped))
+
+    it.effect("adopts a preloaded lazy child whose state decodes asynchronously", () =>
+      Effect.gen(function*() {
+        let side = "server"
+        const LatePage = Html.component({
+          name: "LatePage",
+          model: LateLabel,
+          message: Schema.Never
+        }).make({
+          init: () => side,
+          update: ($) => $.model,
+          view: (h, model) => h.label(model, h.input.attr("name", "q"))
+        })
+        const makeApp = () => {
+          const LazyPage = Component.lazy(
+            "LazyLate",
+            () => Promise.resolve(LatePage)
+          )
+          const App = Html.component({
+            name: "App",
+            model: Schema.Null,
+            message: Schema.Never
+          }).make({
+            init: () => null,
+            update: ($) => $.model,
+            view: (h) => h.div(LazyPage(h, { fallback: () => h.p("Loading") }))
+          })
+          return { App, LazyPage }
+        }
+
+        const [rendered, open] = yield* renderLate(
+          HtmlServer.renderToHtml(makeApp().App, {})
+        )
+        const app = yield* container(rendered.html)
+        const serverInput = app.querySelector("input")!
+
+        side = "client"
+        const client = makeApp()
+        yield* Effect.promise(() => client.LazyPage.preload())
+        const root = yield* HtmlHydrate.hydrateEffect(
+          client.App,
+          {},
+          app,
+          rendered.state
+        )
+        yield* open
+        yield* root.adopted
+        yield* tick
+
+        assert.strictEqual(app.querySelector("input"), serverInput)
+        assert.strictEqual(app.querySelector("label")?.textContent, "server")
+      }).pipe(Effect.scoped))
+
+    it.effect("adopts a shared lazy child through ssr()", () =>
+      Effect.gen(function*() {
+        let calls = 0
+        const Page = Html.component({
+          name: "Page",
+          model: Schema.String,
+          message: Schema.Never
+        }).make({
+          init: () => calls++ === 0 ? "server" : "client",
+          update: ($) => $.model,
+          view: (h, model) => h.label(model, h.input.attr("name", "q"))
+        })
+        const LazyPage = Component.lazy(
+          "LazyPage",
+          () => Promise.resolve(Page)
+        )
+        const App = Html.component({
+          name: "App",
+          model: Schema.Null,
+          message: Schema.Never
+        }).make({
+          init: () => null,
+          update: ($) => $.model,
+          view: (h) => h.div(LazyPage(h, { fallback: () => h.p("Loading") }))
+        })
+
+        const result = yield* ssr(App, {})
+        assert.deepStrictEqual(result.adopted, ["/App", "/App/LazyPage[]"])
+        assert.deepStrictEqual(result.misses, [])
+        assert.strictEqual(
+          result.container.querySelector("label")?.textContent,
+          "server"
+        )
+      }).pipe(Effect.provide(TestHost.layer()), Effect.scoped))
   })
 })
