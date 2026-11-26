@@ -44,6 +44,19 @@
  * reports it, and the Model must follow. Position a popover next to its
  * trigger with CSS anchor positioning.
  *
+ * On URL-bearing attributes (`href`, `src`, `action`, `formaction`,
+ * `xlink:href`, `data` on `<object>`, and `to`, `from`, `by` and each
+ * `;`-separated item of `values` on SVG `<set>` and `<animate>`), both the
+ * browser host and the server renderer write `""` in place of `javascript:`
+ * and `vbscript:` URLs, ignoring ASCII control characters and spaces as
+ * browsers do. Note that `href=""` links to the current page and `action=""`
+ * and `formaction=""` submit to it; `""` is kept to match other empty
+ * attributes and keep server rendering and hydration aligned. The browser host
+ * applies the same rule to the matching DOM properties (`href`, `src`,
+ * `action`, `formAction`, and `data` on `<object>`) on built-in elements.
+ * Other schemes (`https:`, `mailto:`, `tel:`, `data:`, `blob:`, custom
+ * schemes) and relative URLs are written unchanged.
+ *
  * **Example** (A controlled text field)
  *
  * ```ts import.meta.vitest

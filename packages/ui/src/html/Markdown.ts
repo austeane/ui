@@ -33,6 +33,14 @@ import * as Schema from "effect/Schema"
 import type * as SchemaAST from "effect/SchemaAST"
 import type * as View from "../View.ts"
 import type * as Html from "./Html.ts"
+import { urlScheme } from "./internal/urlScheme.ts"
+
+const allowedSchemes: ReadonlySet<string> = new Set([
+  "http",
+  "https",
+  "mailto",
+  "tel"
+])
 
 /**
  * Whether a link or image URL is allowed in a document: relative, or with the
@@ -49,10 +57,8 @@ import type * as Html from "./Html.ts"
  * @since 0.1.0
  */
 export const isAllowedUrl = (url: string): boolean => {
-  // oxlint-disable-next-line no-control-regex
-  const compact = url.replace(/[\u0000-\u0020]/g, "")
-  return !/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(compact) ||
-    /^(?:https?|mailto|tel):/i.test(compact)
+  const scheme = urlScheme(url)
+  return scheme === undefined || allowedSchemes.has(scheme)
 }
 
 /** @internal */

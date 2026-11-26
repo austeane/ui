@@ -17,7 +17,9 @@ import type * as View from "../View.ts"
 import * as BrowserHost from "./BrowserHost.ts"
 import type * as Html from "./Html.ts"
 import { attributeOf, isRadio, radioGroup } from "./internal/dom.ts"
+import { isCustomTag } from "./internal/elements.ts"
 import * as markers from "./internal/markers.ts"
+import { attributeValue, propertyValue } from "./internal/urlScheme.ts"
 
 const ELEMENT = 1
 const TEXT = 3
@@ -451,9 +453,12 @@ const between = (
         const element = node as Element
         const normalized = attributeOf(element, name)
         if (normalized === undefined) return
-        if (value !== undefined) (entry.names ??= []).push(normalized)
+        const next = value === undefined
+          ? undefined
+          : attributeValue(element.localName, normalized, value)
+        if (next !== undefined) (entry.names ??= []).push(normalized)
         const served = element.getAttribute(normalized)
-        if (value === undefined ? served === null : served === value) return
+        if (next === undefined ? served === null : served === next) return
         return base.setAttr(node, name, value, served ?? undefined)
       }
       base.setAttr(node, name, value)
@@ -467,8 +472,12 @@ const between = (
       if (edits.keeps(node, name, value)) {
         return keeping(node, name, value, () => base.setProp(node, name, value))
       }
+      const element = node as Element
+      const next = isCustomTag(element.localName)
+        ? value
+        : propertyValue(element.localName, name, value)
       if (
-        entry !== undefined && (node as any)[name] === value &&
+        entry !== undefined && (node as any)[name] === next &&
         base.controlled?.has(name) !== true
       ) return
       base.setProp(node, name, value)

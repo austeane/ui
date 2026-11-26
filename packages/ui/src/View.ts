@@ -1539,6 +1539,18 @@ export class ElementBuilder<
   /**
    * Sets an attribute, or removes it with `undefined`.
    *
+   * **Details**
+   *
+   * The HTML browser host and server renderer write `""` in place of
+   * `javascript:` and `vbscript:` URLs (ignoring ASCII control characters and
+   * spaces) on URL-bearing attributes (`href`, `src`, `action`, `formaction`,
+   * `xlink:href`, `data` on `<object>`, and `to`, `from`, `by` and each
+   * `;`-separated item of `values` on SVG `<set>` and `<animate>`). Note that
+   * `href=""` links to the current page and `action=""` and `formaction=""`
+   * submit to it; `""` is kept to match other empty attributes and keep server
+   * rendering and hydration aligned. Other schemes, such as `https:`,
+   * `mailto:`, `data:` and `blob:`, and relative URLs are left unchanged.
+   *
    * @since 0.1.0
    */
   attr(name: string, value: string | undefined): this {
@@ -1563,7 +1575,9 @@ export class ElementBuilder<
     return out
   }
   /**
-   * Sets multiple attributes, removing any whose value is `undefined`.
+   * Sets multiple attributes, removing any whose value is `undefined`. Follows
+   * the same rules as `attr`, including replacing `javascript:` and
+   * `vbscript:` URLs in URL-bearing HTML attributes with `""`.
    *
    * @since 0.1.0
    */
@@ -1604,7 +1618,10 @@ export class ElementBuilder<
     return out
   }
   /**
-   * Sets a property. The host decides what it means.
+   * Sets a property. The host decides what it means. On built-in HTML
+   * elements, the browser host writes `""` in place of `javascript:` and
+   * `vbscript:` URLs on URL-bearing properties (`href`, `src`, `action`,
+   * `formAction`, and `data` on `<object>`).
    *
    * @since 0.1.0
    */

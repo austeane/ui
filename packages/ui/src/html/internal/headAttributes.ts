@@ -2,6 +2,7 @@
 import { attributeName } from "../../internal/attributeName.ts"
 import { emptyHtml } from "../../internal/heads.ts"
 import type * as HtmlHead from "../HtmlHead.ts"
+import { attributeValue } from "./urlScheme.ts"
 
 /** @internal */
 export const marker = "data-eui"
@@ -19,7 +20,9 @@ export const normalize = (
   const out = new Map<string, string>()
   for (const [key, value] of pairs) {
     const normalized = name(key)
-    if (normalized !== undefined) out.set(normalized, value)
+    if (normalized !== undefined) {
+      out.set(normalized, attributeValue("", normalized, value))
+    }
   }
   return [...out]
 }

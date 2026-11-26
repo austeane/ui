@@ -26,7 +26,9 @@ export const svgTags: ReadonlySet<string> = new Set([
   "stop",
   "filter",
   "image",
-  "foreignObject"
+  "foreignObject",
+  "animate",
+  "set"
 ])
 
 /** @internal */

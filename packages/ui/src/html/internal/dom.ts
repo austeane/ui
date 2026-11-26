@@ -14,6 +14,7 @@ import {
 } from "./payload.ts"
 import { pointerTypeOf } from "./pointer.ts"
 import * as submit from "./submit.ts"
+import { attributeValue, propertyValue } from "./urlScheme.ts"
 
 /** @internal */
 export const SVG = "http://www.w3.org/2000/svg"
@@ -697,6 +698,9 @@ export const makeHost = (
       const element = node as HTMLElement
       const normalized = attributeOf(element, name)
       if (normalized === undefined) return
+      if (value !== undefined) {
+        value = attributeValue(element.localName, normalized, value)
+      }
       if (
         normalized !== "style" || element.style === undefined ||
         element.getAttribute("style") === (previous ?? null)
@@ -780,6 +784,9 @@ export const makeHost = (
         if (element[name] !== value) writeControlled(element, name, value)
         if (name === "value" && !composing.has(node)) edits.delete(node)
         return
+      }
+      if (!isCustomTag(element.localName)) {
+        value = propertyValue(element.localName, name, value)
       }
       element[name] = value === undefined
         ? (typeof element[name] === "string"

@@ -8,6 +8,7 @@ import * as Head from "../HtmlHead.ts"
 import * as elements from "./elements.ts"
 import * as headAttributes from "./headAttributes.ts"
 import * as markers from "./markers.ts"
+import { attributeValue } from "./urlScheme.ts"
 
 // ---------------------------------------------------------------------------
 // HTML
@@ -92,7 +93,9 @@ const elementAttributes = (
   const svg = elements.svgTags.has(tag)
   for (const [name, value] of Object.entries(attrs)) {
     const normalized = elements.attributeName(name, svg)
-    if (normalized !== undefined) out.set(normalized, value)
+    if (normalized !== undefined) {
+      out.set(normalized, attributeValue(tag, normalized, value))
+    }
   }
   if (elements.isCustomTag(tag)) return out
   for (const [name, value] of Object.entries(props)) {
@@ -154,7 +157,7 @@ const plainAttributes = (
         elements.attributeName(name, true) !== name
       ) return undefined
     }
-    const value = attrs[name]!
+    const value = attributeValue(tag, name, attrs[name]!)
     out += value === "" ? ` ${name}` : ` ${name}="${escapeAttribute(value)}"`
   }
   return out
