@@ -315,6 +315,111 @@ describe("HtmlServer", { concurrent: false }, () => {
       }
     }).pipe(Effect.scoped))
 
+  it.effect("drops javascript: and vbscript: URLs from SVG animation attributes on the server, fresh client and hydrated client", () =>
+    Effect.gen(function*() {
+      const Page = Html.component({
+        name: "AnimateUrls",
+        props: Schema.Struct({ url: Schema.String }),
+        model: Schema.String,
+        message: Schema.String
+      }).make({
+        init: ($) => $.props.url,
+        update: (_, message) => message,
+        view: (h, url) =>
+          h.el("svg").children(
+            h.el("a").attr("href", "#").children(
+              h.el("animate").attr("attributeName", "href").attr(
+                "values",
+                `#;${url}`
+              ),
+              h.el("animate").attr("attributeName", "href").attr("from", url)
+                .attr("to", url),
+              h.el("set").attr("attributeName", "href").attr("to", url)
+            ),
+            h.el("a").attr("xlink:href", "#").children(
+              h.el("animate").attr("attributeName", "xlink:href").attr(
+                "values",
+                url
+              ),
+              // Lowercase attribute name exercises `server.ts`'s `plainAttributes` path.
+              h.el("set").attr("attributename", "xlink:href").attr("to", url)
+            )
+          )
+      })
+      const blocked = " Java\tScript:"
+      const rendered = yield* HtmlServer.renderToHtml(Page, { url: blocked })
+      expect(rendered.html).toBe(
+        "<!--[/AnimateUrls--><svg><a href=\"#\">" +
+          "<animate attributename=\"href\"></animate>" +
+          "<animate attributename=\"href\"></animate>" +
+          "<set attributename=\"href\"></set>" +
+          "</a><a xlink:href=\"#\">" +
+          "<animate attributename=\"xlink:href\"></animate>" +
+          "<set attributename=\"xlink:href\"></set>" +
+          "</a></svg><!--]/AnimateUrls-->"
+      )
+      const relative = yield* HtmlServer.renderToHtml(Page, {
+        url: "/relative"
+      })
+      expect(relative.html).toBe(
+        "<!--[/AnimateUrls--><svg><a href=\"#\">" +
+          "<animate attributename=\"href\" values=\"#;/relative\"></animate>" +
+          "<animate attributename=\"href\" from=\"/relative\" to=\"/relative\"></animate>" +
+          "<set attributename=\"href\" to=\"/relative\"></set>" +
+          "</a><a xlink:href=\"#\">" +
+          "<animate attributename=\"xlink:href\" values=\"/relative\"></animate>" +
+          "<set attributename=\"xlink:href\" to=\"/relative\"></set>" +
+          "</a></svg><!--]/AnimateUrls-->"
+      )
+      const written = (url: string) => [
+        `values=#;${url}`,
+        `from=${url}`,
+        `to=${url}`,
+        `to=${url}`,
+        `values=${url}`,
+        `to=${url}`
+      ]
+      for (const hydrate of [false, true]) {
+        const stale = rendered.html.replace(
+          "<set attributename=\"href\"></set>",
+          "<set attributename=\"href\" to=\"javascript:\"></set>"
+        )
+        const app = yield* container(hydrate ? stale : "")
+        const before = app.firstElementChild
+        const root = yield* (hydrate
+          ? HtmlHydrate.hydrateEffect(
+            Page,
+            { url: blocked },
+            app,
+            rendered.state
+          )
+          : BrowserHost.mountEffect(Page, { url: blocked }, app))
+        if (hydrate) expect(app.firstElementChild).toBe(before)
+        const animated = () =>
+          Array.from(
+            app.querySelectorAll("animate, set"),
+            (element) =>
+              Array.from(element.attributes)
+                .filter((a) =>
+                  a.name === "values" || a.name === "from" || a.name === "to"
+                )
+                .map((a) => `${a.name}=${a.value}`)
+          ).flat()
+        expect(animated()).toEqual([])
+        for (
+          const [url, expected] of [
+            ["/relative", written("/relative")],
+            ["VBSCRIPT:", []],
+            ["https://example.com", written("https://example.com")]
+          ] as const
+        ) {
+          root.send(url)
+          yield* tick
+          expect(animated()).toEqual(expected)
+        }
+      }
+    }).pipe(Effect.scoped))
+
   it.effect("a blocked URL property removes only the attribute it reflects, and adoption drops a stale blocked URL", () =>
     Effect.gen(function*() {
       let sets = 0
